@@ -24,7 +24,7 @@
     async function checkPayment(memid) {
       try {
         // Fetch the live Razor page
-        const response = await fetch("https://www.event.ananmembers.org/RegistrationReport");
+        const response = await fetch("https://www.event.ananmembers.org/membershipRegister");
         const html = await response.text();
 
         // Quick search for the member ID in the page
