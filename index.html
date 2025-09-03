@@ -3,59 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code Payment Checker</title>
+  <title>QR Code Reader</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
     #reader { width: 300px; margin: 0 auto; }
-    #result { font-size: 1.2em; margin-top: 20px; }
-    .paid { color: green; font-weight: bold; }
-    .not-paid { color: red; font-weight: bold; }
+    #result { font-size: 1.2em; margin-top: 15px; }
+    button { margin-top: 20px; padding: 10px 20px; font-size: 1em; cursor: pointer; }
   </style>
 </head>
 <body>
   <h2>Scan QR Code</h2>
   <div id="reader"></div>
   <p id="result">Waiting for scan...</p>
+  <button id="checkBtn" disabled>Check Payment</button>
 
   <script>
+    let lastScannedId = null;
     const resultElement = document.getElementById("result");
+    const checkBtn = document.getElementById("checkBtn");
 
-    async function checkPayment(memid) {
-      try {
-        // Fetch the live Razor page
-        const response = await fetch("https://www.event.ananmembers.org/membershipRegister");
-        const html = await response.text();
-
-        // Quick search for the member ID in the page
-        if (html.includes(memid)) {
-          resultElement.innerHTML = `✅ Member <span class="paid">${memid}</span> has PAID`;
-        } else {
-          resultElement.innerHTML = `❌ Member <span class="not-paid">${memid}</span> has NOT paid`;
-        }
-      } catch (err) {
-        console.error(err);
-        resultElement.textContent = "⚠️ Could not check payment (Network or CORS issue)";
-      }
+    function extractInteger(text) {
+      // Extract the first integer from the scanned text
+      const match = text.match(/\d+/);
+      return match ? match[0] : null;
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-      resultElement.textContent = "Scanned ID: " + decodedText;
-      checkPayment(decodedText);
+      const scannedInt = extractInteger(decodedText);
+      if (scannedInt) {
+        lastScannedId = scannedInt;
+        resultElement.textContent = `Scanned ID: ${scannedInt}`;
+        checkBtn.disabled = false; // enable button
+      } else {
+        resultElement.textContent = "No valid number found in QR code";
+        checkBtn.disabled = true;
+      }
     }
 
     function onScanError(errorMessage) {
-      // ignore continuous scan errors
+      // ignore scan errors
     }
 
-    // Start the camera scanner
+    checkBtn.addEventListener("click", async () => {
+      if (!lastScannedId) return;
+
+      resultElement.textContent = "Checking payment...";
+      try {
+        const response = await fetch("https://www.event.ananmembers.org/RegistrationReport");
+        const html = await response.text();
+
+        if (html.includes(lastScannedId)) {
+          resultElement.innerHTML = `✅ Member <strong>${lastScannedId}</strong> has PAID`;
+          resultElement.style.color = "green";
+        } else {
+          resultElement.innerHTML = `❌ Member <strong>${lastScannedId}</strong> has NOT paid`;
+          resultElement.style.color = "red";
+        }
+      } catch (err) {
+        resultElement.textContent = "⚠️ Could not check payment (Network or CORS issue)";
+      }
+    });
+
+    // Start camera scanner
     const html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start(
       { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: 250
-      },
+      { fps: 10, qrbox: 250 },
       onScanSuccess,
       onScanError
     );
