@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Student Payment Checker</title>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+    video { border: 2px solid black; border-radius: 8px; }
+    #status { font-size: 1.2em; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Scan Student Barcode</h2>
+  <video id="video" width="300" height="200"></video>
+  <p>Scanned ID: <span id="result"></span></p>
+  <p id="status"></p>
+
+  <script>
+    let paidList = [];
+
+    // Load paid list from live page (replace URL with yours)
+    async function loadPaidList() {
+      try {
+        let response = await fetch("https://example.com/paid-list.html"); 
+        let text = await response.text();
+
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(text, "text/html");
+
+        let rows = doc.querySelectorAll("table tr");
+        paidList = [];
+        rows.forEach(row => {
+          let cells = row.querySelectorAll("td");
+          if (cells.length > 0) {
+            paidList.push({
+              memid: cells[0].textContent.trim(),
+              name: cells[1].textContent.trim(),
+              email: cells[2].textContent.trim(),
+              amount: cells[3].textContent.trim()
+            });
+          }
+        });
+      } catch (err) {
+        console.error("Could not load paid list:", err);
+      }
+    }
+
+    // Start scanner
+    async function startScanner() {
+      await loadPaidList();
+
+      const codeReader = new ZXing.BrowserBarcodeReader();
+      const videoElem = document.getElementById("video");
+      const resultElem = document.getElementById("result");
+      const statusElem = document.getElementById("status");
+
+      let lastScan = "";
+      codeReader.decodeFromVideoDevice(null, videoElem, (result, err) => {
+        if (result && result.text !== lastScan) {
+          lastScan = result.text;
+          resultElem.textContent = lastScan;
+
+          let member = paidList.find(m => m.memid === lastScan);
+          if (member) {
+            statusElem.textContent = `✅ ${member.name} (${member.email}) has PAID ${member.amount}`;
+            statusElem.style.color = "green";
+          } else {
+            statusElem.textContent = `❌ Student ${lastScan} has NOT paid`;
+            statusElem.style.color = "red";
+          }
+        }
+      });
+    }
+
+    startScanner();
+  </script>
+</body>
+</html>
