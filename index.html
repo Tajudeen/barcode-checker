@@ -1,78 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Student Payment Checker</title>
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Payment Checker</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-    video { border: 2px solid black; border-radius: 8px; }
-    #status { font-size: 1.2em; margin-top: 10px; }
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+    #reader { width: 300px; margin: 0 auto; }
+    #result { font-size: 1.2em; margin-top: 20px; }
+    .paid { color: green; font-weight: bold; }
+    .not-paid { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h2>Scan Student Barcode</h2>
-  <video id="video" width="300" height="200"></video>
-  <p>Scanned ID: <span id="result"></span></p>
-  <p id="status"></p>
+  <h2>Scan QR Code</h2>
+  <div id="reader"></div>
+  <p id="result">Waiting for scan...</p>
 
   <script>
-    let paidList = [];
+    const resultElement = document.getElementById("result");
 
-    // Load paid list from live page (replace URL with yours)
-    async function loadPaidList() {
+    async function checkPayment(memid) {
       try {
-        let response = await fetch("https://example.com/paid-list.html"); 
-        let text = await response.text();
+        // Replace with your real live page URL
+        const response = await fetch("https://your-live-page.com/paid-list.html");
+        const html = await response.text();
 
-        let parser = new DOMParser();
-        let doc = parser.parseFromString(text, "text/html");
-
-        let rows = doc.querySelectorAll("table tr");
-        paidList = [];
-        rows.forEach(row => {
-          let cells = row.querySelectorAll("td");
-          if (cells.length > 0) {
-            paidList.push({
-              memid: cells[0].textContent.trim(),
-              name: cells[1].textContent.trim(),
-              email: cells[2].textContent.trim(),
-              amount: cells[3].textContent.trim()
-            });
-          }
-        });
+        // Simple search: check if memid appears in page text
+        if (html.includes(memid)) {
+          resultElement.innerHTML = `✅ Member <span class="paid">${memid}</span> has PAID`;
+        } else {
+          resultElement.innerHTML = `❌ Member <span class="not-paid">${memid}</span> has NOT paid`;
+        }
       } catch (err) {
-        console.error("Could not load paid list:", err);
+        resultElement.textContent = "⚠️ Could not check payment (CORS or network issue)";
       }
     }
 
-    // Start scanner
-    async function startScanner() {
-      await loadPaidList();
-
-      const codeReader = new ZXing.BrowserBarcodeReader();
-      const videoElem = document.getElementById("video");
-      const resultElem = document.getElementById("result");
-      const statusElem = document.getElementById("status");
-
-      let lastScan = "";
-      codeReader.decodeFromVideoDevice(null, videoElem, (result, err) => {
-        if (result && result.text !== lastScan) {
-          lastScan = result.text;
-          resultElem.textContent = lastScan;
-
-          let member = paidList.find(m => m.memid === lastScan);
-          if (member) {
-            statusElem.textContent = `✅ ${member.name} (${member.email}) has PAID ${member.amount}`;
-            statusElem.style.color = "green";
-          } else {
-            statusElem.textContent = `❌ Student ${lastScan} has NOT paid`;
-            statusElem.style.color = "red";
-          }
-        }
-      });
+    function onScanSuccess(decodedText, decodedResult) {
+      resultElement.textContent = "Scanned ID: " + decodedText;
+      checkPayment(decodedText); // check payment immediately
     }
 
-    startScanner();
+    function onScanError(errorMessage) {
+      // ignore continuous scan errors
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: 250
+      },
+      onScanSuccess,
+      onScanError
+    );
   </script>
 </body>
 </html>
